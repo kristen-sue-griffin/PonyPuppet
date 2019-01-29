@@ -1,0 +1,534 @@
+<html>
+    <head>
+        <title>Box2dWeb example</title>
+    </head>
+    <body onload="init();">
+        <canvas id="canvas" width="1024" height="700" ></canvas>
+    </body>
+    <script type="text/javascript" src="Box2dWeb-2.1.a.3.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <script type="text/javascript">
+        var images = [];
+        function preload() {
+            for (var i = 0; i < arguments.length; i++) {
+                images[i] = new Image();
+                images[i].src = preload.arguments[i];
+                //var imageinfo = {img: images[i], imgsrc: 0, height: images[i].height, width: images[i].width};
+                ;
+            }
+        }
+        //-- Needs to be in the z order you want them to be placed --//
+        preload(
+            'horse_body.png',
+            'horse_head.png',            
+            'horse_right_frontupper.png',
+            'horse_right_frontlower.png',
+            'horse_right_fronthoof.png',
+            'horse_left_frontupper.png',
+            'horse_left_frontlower.png',
+            'horse_left_fronthoof.png',
+            'horse_left_backupper.png',
+            'horse_left_backlower.png',
+            'horse_left_backhoof.png',
+            'horse_right_backupper.png',
+            'horse_right_backlower.png',
+            'horse_right_backhoof.png',
+            'horse_tail.png'
+        )
+        //var image = new Image();
+        //image.src = "image.png";
+        var PHY_DRAW_SCALE = 7.5; DRAW_SCALE = 0.5// PHY_DRAW_SCALE is a magic number that if changed causes the follow to be odd
+   
+        window.requestAnimFrame = (function(){
+            return  window.requestAnimationFrame       || 
+                    window.webkitRequestAnimationFrame || 
+                    window.mozRequestAnimationFrame    || 
+                    window.oRequestAnimationFrame      || 
+                    window.msRequestAnimationFrame     || 
+                    function(/* function */ callback, /* DOMElement */ element){
+                      window.setTimeout(callback, 1000 / 60);
+                    };
+        })();
+
+        function init() {
+            var    b2Vec2 = Box2D.Common.Math.b2Vec2
+              ,    b2AABB = Box2D.Collision.b2AABB
+              ,    b2BodyDef = Box2D.Dynamics.b2BodyDef
+              ,    b2Body = Box2D.Dynamics.b2Body
+              ,    b2FixtureDef = Box2D.Dynamics.b2FixtureDef
+              ,    b2Fixture = Box2D.Dynamics.b2Fixture
+              ,    b2World = Box2D.Dynamics.b2World
+              ,    b2MassData = Box2D.Collision.Shapes.b2MassData
+              ,    b2PolygonShape = Box2D.Collision.Shapes.b2PolygonShape
+              ,    b2CircleShape = Box2D.Collision.Shapes.b2CircleShape
+              ,    b2DebugDraw = Box2D.Dynamics.b2DebugDraw
+              ,    b2MouseJointDef =  Box2D.Dynamics.Joints.b2MouseJointDef
+              ,    b2RevoluteJointDef =  Box2D.Dynamics.Joints.b2RevoluteJointDef
+              ,    b2DistanceJointDef =  Box2D.Dynamics.Joints.b2DistanceJointDef
+              ,    b2WeldJointDef = Box2D.Dynamics.Joints.b2WeldJointDef
+              ;
+             
+            var world = new b2World(
+                    new b2Vec2(0, 100)    //gravity
+                ,   true                 //allow sleep
+            );
+
+            // Get the canvas info
+            var canvas = document.getElementById("canvas");
+            var context = canvas.getContext("2d");
+            context.fillStyle = "blue";
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            // create physics for  pony - stuffed it in {} for collapse
+            {
+            
+            // Create all of the body object in the order we need them to appear z wise with the image            
+            // User_data is to store the image number from the preload so I can just jiggle them around here for sort order, the offset for the image x & y
+            var frontleghoofright = createBox(world, 0, 0, 15 , 15, -1,  {user_data : [7,-45,-6]});
+            var frontleglowerright = createBox(world, 0, 0, 5, 20, -1,  {user_data : [6, -15,-5]});
+            var frontlegupperright = createBox(world, 0, 0, 5, 20, -1,  {user_data : [5, -30, 0]});            
+            var backleghoofleft = createBox(world, 0,0, 5 , 5, -1,  {user_data : [10,-43,-6]})
+            var backleglowerleft = createBox(world, 0, 0, 10, 10, -1,  {user_data : [9,-25,0]});
+            var backlegupperleft = createBox(world, 0, 0, 10 , 10, -1,  {user_data : [8,-40,-30]});
+            var tail = createBox(world, 0,0, 10, 15, -1, {user_data : [14,0,-8]});
+            var head = createBox(world, 0, 0, 15 ,15, -1, {user_data : [1, -85, -40]});
+            var body = createBox(world, 0, 0, 25 , 5, -1, {user_data : [0, -285,-148]}); 
+            var frontleghoofleft = createBox(world, 0, 0, 15 , 15, -1,  {user_data : [4, -30,-5]});
+            var frontleglowerleft = createBox(world, 0, 0, 5 , 20, -1,  {user_data : [3,-35,0]});
+            var frontlegupperleft = createBox(world, 0, 0, 5 , 20, -1, {user_data : [2, -110, 0]});
+            var backleghoofright = createBox(world, 0, 0, 5 , 5, -1, {user_data : [13,-43,-6]});
+            var backleglowerright = createBox(world, 0, 0, 10 , 10, -1,  {user_data : [12,-25,0]});
+            var backlegupperright = createBox(world, 0, 0, 10 , 10, -1,  {user_data : [11,-55,-30]});
+            
+            
+            // Create main hanging point
+            //alert(context.canvas.width/2/PHY_DRAW_SCALE);
+            var hanger = createBox(world, context.canvas.width/2/PHY_DRAW_SCALE, 0, 50 ,3, 1,  {type : b2Body.b2_staticBody, user_data :[-1,0,0]}); 
+             // Create the hanger for midback
+            var eyehole = createBox(world, context.canvas.width/2/PHY_DRAW_SCALE, 0, 30 , 5, -1, {user_data : [-1,0,0]});
+            
+            //create/connect weld joint
+            var joint_def = new b2WeldJointDef();
+            joint_def.bodyA = eyehole;
+            joint_def.bodyB = body;             
+            joint_def.localAnchorA = new b2Vec2(0, 2);
+            joint_def.localAnchorB = new b2Vec2(0, 0);
+            
+            //add the joint to the world
+            world.CreateJoint(joint_def);
+            
+            //create distance joint between b and c
+            distance_joint = new b2DistanceJointDef();
+            distance_joint.bodyA = hanger;
+            distance_joint.bodyB = eyehole;
+            //connect the centers - center in local coordinate - relative to body is 0,0
+            distance_joint.localAnchorA = new b2Vec2(0,0);
+            distance_joint.localAnchorB = new b2Vec2(0, 0);
+            //length of joint
+            distance_joint.length = 25;
+            distance_joint.collideConnected = false;
+             
+            //add the joint to the world
+            world.CreateJoint(distance_joint);
+
+            
+            // Neck/Head            
+            joint_def = new b2RevoluteJointDef();
+            joint_def.bodyA = body;
+            joint_def.bodyB = head;
+            joint_def.localAnchorA = new b2Vec2(-14.75, -5.52);
+            joint_def.localAnchorB = new b2Vec2(0, 0);
+            joint_def.enableLimit = true;
+            joint_def.lowerAngle = -5 * Math.PI / 180;
+            joint_def.upperAngle = 25 * Math.PI / 180;
+            joint_def.referenceAngle = 15 * Math.PI / 180;
+            joint_def.collideConnected = false;
+            world.CreateJoint(joint_def);
+            
+            
+            // front left leg (Not really left - more like stage left oops!)            
+            joint_def = new b2RevoluteJointDef();
+            joint_def.bodyA = body;
+            joint_def.bodyB = frontlegupperleft;
+            joint_def.localAnchorA = new b2Vec2(-7.5, 6);
+            joint_def.localAnchorB = new b2Vec2(0, 0);
+            joint_def.enableLimit = true;
+            joint_def.lowerAngle = -25 * Math.PI / 180;
+            joint_def.upperAngle = 25 * Math.PI / 180;
+            joint_def.referenceAngle = 1 * Math.PI / 180;
+            joint_def.collideConnected = false;
+            world.CreateJoint(joint_def);
+            
+            
+            joint_def = new b2RevoluteJointDef();
+            joint_def.bodyA = frontlegupperleft;
+            joint_def.bodyB = frontleglowerleft;
+            joint_def.localAnchorA = new b2Vec2(-6, 6.75);
+            joint_def.localAnchorB = new b2Vec2(0, 0);
+            joint_def.enableLimit = true;
+            joint_def.lowerAngle = -25 * Math.PI / 180;
+            joint_def.upperAngle = 25 * Math.PI / 180;
+            joint_def.referenceAngle = 1 * Math.PI / 180;
+            joint_def.collideConnected = false;
+            world.CreateJoint(joint_def);
+            
+            
+            joint_def = new b2RevoluteJointDef();
+            joint_def.bodyA = frontleglowerleft;
+            joint_def.bodyB = frontleghoofleft;
+            joint_def.localAnchorA = new b2Vec2(-2, 6);
+            joint_def.localAnchorB = new b2Vec2(0, 0);
+            joint_def.enableLimit = true;
+            joint_def.lowerAngle = -25 * Math.PI / 180;
+            joint_def.upperAngle = 25 * Math.PI / 180;
+            joint_def.referenceAngle = 1 * Math.PI / 180;
+            joint_def.collideConnected = false;
+            world.CreateJoint(joint_def);
+            
+            
+            // front right leg            
+            joint_def = new b2RevoluteJointDef();
+            joint_def.bodyA = body;
+            joint_def.bodyB = frontlegupperright;
+            joint_def.localAnchorA = new b2Vec2(-7.5, 8);
+            joint_def.localAnchorB = new b2Vec2(0, 0);
+            joint_def.enableLimit = true;
+            joint_def.lowerAngle = -25 * Math.PI / 180;
+            joint_def.upperAngle = 25 * Math.PI / 180;
+            joint_def.referenceAngle = 1 * Math.PI / 180;
+            joint_def.collideConnected = false;
+            world.CreateJoint(joint_def);
+            
+            
+            joint_def = new b2RevoluteJointDef();
+            joint_def.bodyA = frontlegupperright;
+            joint_def.bodyB = frontleglowerright;
+            joint_def.localAnchorA = new b2Vec2(-0.5, 9);
+            joint_def.localAnchorB = new b2Vec2(0, 0);
+            joint_def.enableLimit = true;
+            joint_def.lowerAngle = -25 * Math.PI / 180;
+            joint_def.upperAngle = 25 * Math.PI / 180;
+            joint_def.referenceAngle = 1 * Math.PI / 180;
+            joint_def.collideConnected = false;
+            world.CreateJoint(joint_def);            
+                       
+            
+            joint_def = new b2RevoluteJointDef();
+            joint_def.bodyA = frontleglowerright;
+            joint_def.bodyB = frontleghoofright;
+            joint_def.localAnchorA = new b2Vec2(0, 5);
+            joint_def.localAnchorB = new b2Vec2(0, 0);
+            joint_def.enableLimit = true;
+            joint_def.lowerAngle = -25 * Math.PI / 180;
+            joint_def.upperAngle = 25 * Math.PI / 180;
+            joint_def.referenceAngle = -10 * Math.PI / 180;
+            joint_def.collideConnected = false;
+            world.CreateJoint(joint_def);
+            
+            // back left leg            
+            joint_def = new b2RevoluteJointDef();
+            joint_def.bodyA = body;
+            joint_def.bodyB = backlegupperleft;
+            joint_def.localAnchorA = new b2Vec2(13.5, 1.5);
+            joint_def.localAnchorB = new b2Vec2(0, 0);
+            joint_def.enableLimit = true;
+            joint_def.lowerAngle = -25 * Math.PI / 180;
+            joint_def.upperAngle = 25 * Math.PI / 180;
+            joint_def.referenceAngle = -30 * Math.PI / 180;
+            joint_def.collideConnected = false;
+            world.CreateJoint(joint_def);
+            
+            
+            joint_def = new b2RevoluteJointDef();
+            joint_def.bodyA = backlegupperleft;
+            joint_def.bodyB = backleglowerleft;
+            joint_def.localAnchorA = new b2Vec2(5.5, 11);
+            joint_def.localAnchorB = new b2Vec2(0, 0);
+            joint_def.enableLimit = true;
+            joint_def.lowerAngle = 5 * Math.PI / 180;
+            joint_def.upperAngle = 60 * Math.PI / 180;
+            joint_def.referenceAngle = 10 * Math.PI / 180;
+            joint_def.collideConnected = false;
+            world.CreateJoint(joint_def);
+            
+
+            joint_def = new b2RevoluteJointDef();
+            joint_def.bodyA = backleglowerleft;
+            joint_def.bodyB = backleghoofleft;
+            joint_def.localAnchorA = new b2Vec2(3, 10);
+            joint_def.localAnchorB = new b2Vec2(0, 0);
+            joint_def.enableLimit = true;
+            joint_def.lowerAngle = -25 * Math.PI / 180;
+            joint_def.upperAngle = 25 * Math.PI / 180;
+            joint_def.referenceAngle = -10 * Math.PI / 180;
+            joint_def.collideConnected = false;
+            world.CreateJoint(joint_def);
+            
+            
+            // back right leg            
+            joint_def = new b2RevoluteJointDef();
+            joint_def.bodyA = body;
+            joint_def.bodyB = backlegupperright;
+            joint_def.localAnchorA = new b2Vec2(13.5, 1.5);
+            joint_def.localAnchorB = new b2Vec2(0, 0);
+            joint_def.enableLimit = true;
+            joint_def.lowerAngle = -75 * Math.PI / 180;
+            joint_def.upperAngle = 25 * Math.PI / 180;
+            joint_def.referenceAngle = 30 * Math.PI / 180;
+            joint_def.collideConnected = false;
+            world.CreateJoint(joint_def);
+                       
+            
+            joint_def = new b2RevoluteJointDef();
+            joint_def.bodyA = backlegupperright;
+            joint_def.bodyB = backleglowerright;
+            joint_def.localAnchorA = new b2Vec2(1, 11);
+            joint_def.localAnchorB = new b2Vec2(0, 0);
+            joint_def.enableLimit = true;
+            joint_def.lowerAngle = 5 * Math.PI / 180;
+            joint_def.upperAngle = 60 * Math.PI / 180;
+            joint_def.referenceAngle = 10 * Math.PI / 180;
+            joint_def.collideConnected = false;
+            world.CreateJoint(joint_def);            
+                       
+            
+            joint_def = new b2RevoluteJointDef();
+            joint_def.bodyA = backleglowerright;
+            joint_def.bodyB = backleghoofright;
+            joint_def.localAnchorA = new b2Vec2(0, 10);
+            joint_def.localAnchorB = new b2Vec2(0, 0);
+            joint_def.enableLimit = true;
+            joint_def.lowerAngle = -40 * Math.PI / 180;
+            joint_def.upperAngle = 25 * Math.PI / 180;
+            joint_def.referenceAngle = -10 * Math.PI / 180;
+            joint_def.collideConnected = false;
+            world.CreateJoint(joint_def);
+            
+            
+            joint_def = new b2RevoluteJointDef();
+            joint_def.bodyA = body;
+            joint_def.bodyB = tail;
+            joint_def.localAnchorA = new b2Vec2(19, 0.5);
+            joint_def.localAnchorB = new b2Vec2(0, 0);
+            joint_def.enableLimit = true;
+            joint_def.lowerAngle = -25 * Math.PI / 180;
+            joint_def.upperAngle = 25 * Math.PI / 180;
+            joint_def.referenceAngle = 1 * Math.PI / 180;
+            joint_def.collideConnected = false;
+            world.CreateJoint(joint_def);
+            
+            } 
+            
+            //setup debug draw
+            var debugDraw = new b2DebugDraw();
+                debugDraw.SetSprite(context);
+                debugDraw.SetDrawScale(PHY_DRAW_SCALE);
+                debugDraw.SetFillAlpha(0.5);
+                debugDraw.SetLineThickness(1.0);
+                debugDraw.SetFlags(b2DebugDraw.e_shapeBit | b2DebugDraw.e_jointBit);
+                world.SetDebugDraw(debugDraw);
+             
+            requestAnimFrame(update);
+             
+            //mouse
+            var mouseX, mouseY, mousePVec, isMouseDown, selectedBody, mouseJoint;
+            var canvasPosition = getElementPosition(canvas);
+             
+            document.addEventListener("mousedown", function(e) {
+                isMouseDown = true;
+                handleMouseMove(e);
+                document.addEventListener("mousemove", handleMouseMove, true);
+            }, true);
+             
+            document.addEventListener("mouseup", function() {
+                document.removeEventListener("mousemove", handleMouseMove, true);
+                isMouseDown = false;
+                mouseX = undefined;
+                mouseY = undefined;
+            }, true);
+             
+            function handleMouseMove(e) {
+                mouseX = (e.clientX - canvasPosition.x) / PHY_DRAW_SCALE;
+                mouseY = (e.clientY - canvasPosition.y) / PHY_DRAW_SCALE;
+            };
+             
+            function getBodyAtMouse() {
+                mousePVec = new b2Vec2(mouseX, mouseY);
+                var aabb = new b2AABB();
+                aabb.lowerBound.Set(mouseX - 0.001, mouseY - 0.001);
+                aabb.upperBound.Set(mouseX + 0.001, mouseY + 0.001);
+                
+                // Query the world for overlapping shapes.
+
+                selectedBody = null;
+                world.QueryAABB(getBodyCB, aabb);
+                return selectedBody;
+            }
+
+            function getBodyCB(fixture) {
+                if(fixture.GetBody().GetType() != b2Body.b2_staticBody) {
+                   if(fixture.GetShape().TestPoint(fixture.GetBody().GetTransform(), mousePVec)) {
+                        selectedBody = fixture.GetBody();
+                        return false;
+                    }
+                }
+                return true;
+            }
+             
+            //update
+            function update() {
+                if(isMouseDown && (!mouseJoint)) {
+                    var body = getBodyAtMouse();
+                    if(body) {
+                        var md = new b2MouseJointDef();
+                        md.bodyA = world.GetGroundBody();
+                        md.bodyB = body;
+                        md.target.Set(mouseX, mouseY);
+                        md.collideConnected = true;
+                        md.maxForce = 300.0 * body.GetMass();
+                        mouseJoint = world.CreateJoint(md);
+                        body.SetAwake(true);
+                    }
+                }
+                
+                if(mouseJoint) {
+                    if(isMouseDown) {
+                        mouseJoint.SetTarget(new b2Vec2(mouseX, mouseY));
+                    } else {
+                        world.DestroyJoint(mouseJoint);
+                        mouseJoint = null;
+                    }
+                }
+                
+                // Update the box2d world
+                world.Step(1 / 60, 10, 10);
+                world.ClearForces();
+                
+                context.clearRect(0, 0, context.canvas.width, context.canvas.height);
+                //world.DrawDebugData();
+                var count = 0;
+                var jointList = world.GetBodyList();
+                //alert('rer');
+                //alert(typeof jointList);
+                //alert('rar');
+                //var reversedJointList = jointList.reverse();
+                for (b = jointList; b; b = b.GetNext()) {
+                //for(i = 1, len = jointList.length; i < len; i++) {
+                    if (b.GetType() == b2Body.b2_dynamicBody && b.GetUserData() != -1) {
+                        
+                        var data = b.GetUserData();
+                        var imagenum = data[0];
+                        if(imagenum != null){
+                            if(imagenum != -1){
+                                var pos = b.GetPosition();
+                                //var height = b.GetHeight();
+
+                                context.save();
+                                //alert(data[1]);
+                                //alert(data[2]);
+                                
+                                context.translate(pos.x * PHY_DRAW_SCALE, pos.y * PHY_DRAW_SCALE);
+                                context.rotate(b.GetAngle()); // Need to subtract half the size of the box
+                                context.drawImage(images[imagenum],  data[1]*DRAW_SCALE, data[2]*DRAW_SCALE, images[imagenum].width*DRAW_SCALE, images[imagenum].height*DRAW_SCALE);// x pos, y pos, size x, size y
+                                context.restore();   
+                            } 
+                        }
+                    }
+                }
+                requestAnimFrame(update);
+            };
+             
+             //helpers
+             //Function to create a round ball, sphere like object
+             // From http://www.binarytides.com/revolute-joint-box2d-javascript/
+            function createBall(world, x, y, radius, options) 
+            {
+                 //default setting
+                options = $.extend(true, {
+                    'density' : 1.0 ,
+                    'friction' : 1.0 ,
+                    'restitution' : 0.5 ,
+                     
+                    'type' : b2Body.b2_dynamicBody
+                }, options);
+                 
+                var body_def = new b2BodyDef();
+                var fix_def = new b2FixtureDef();
+                 
+                fix_def.density = options.density || 1.0;
+                fix_def.friction = 0.5;
+                fix_def.restitution = 0.5;
+                 
+                var shape = new b2CircleShape(radius);
+                fix_def.shape = shape;
+                 
+                body_def.position.Set(x , y);
+                 
+                body_def.linearDamping = 0.5;
+                body_def.angularDamping = 0.5;
+                 
+                body_def.type = options.type;
+                body_def.userData = options.user_data;
+                 
+                var b = world.CreateBody( body_def );
+                b.CreateFixture(fix_def);
+                 
+                return b;
+            }
+             //Create standard boxes of given height , width at x,y
+             // From http://www.binarytides.com/revolute-joint-box2d-javascript/
+            function createBox(world, x, y, width, height, collisiongroup, options) 
+            {
+                 //default setting
+                options = $.extend(true, {
+                    'density' : 1.0 ,
+                    'friction' : 1.0 ,
+                    'restitution' : 0.5 ,
+                     
+                    'type' : b2Body.b2_dynamicBody
+                }, options); 
+                var body_def = new b2BodyDef();
+                var fix_def = new b2FixtureDef();
+                 
+                fix_def.density = options.density;
+                fix_def.friction = options.friction;
+                fix_def.restitution = options.restitution;
+                 
+                fix_def.shape = new b2PolygonShape();
+                     
+                fix_def.shape.SetAsBox( width/2 , height/2 );
+                fix_def.filter.groupIndex = collisiongroup;
+                
+                body_def.position.Set(x , y);
+                body_def.linearDamping = 0.5;
+                body_def.angularDamping = 0.5;
+                 
+                body_def.type = options.type;
+                body_def.userData = options.user_data;
+                 
+                var b = world.CreateBody( body_def );
+                var f = b.CreateFixture(fix_def);
+                 
+                return b;
+            }
+             //http://js-tut.aardon.de/js-tut/tutorial/position.html
+            function getElementPosition(element) {
+                var elem=element, tagname="", x=0, y=0;
+               
+                while((typeof(elem) == "object") && (typeof(elem.tagName) != "undefined")) {
+                    y += elem.offsetTop;
+                    x += elem.offsetLeft;
+                    tagname = elem.tagName.toUpperCase();
+
+                    if(tagname == "BODY")
+                        elem=0;
+
+                    if(typeof(elem) == "object") {
+                        if(typeof(elem.offsetParent) == "object")
+                            elem = elem.offsetParent;
+                    }
+                }
+                return {x: x, y: y};
+            }
+        };
+   </script>
+</html>
